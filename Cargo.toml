@@ -1,0 +1,6 @@
+
+[workspace]
+members = [
+  "trace_span",
+  "convert-to-chrome-trace"
+]
