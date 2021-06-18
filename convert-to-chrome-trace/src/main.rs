@@ -21,7 +21,7 @@ struct TraceEvent<'a> {
 }
 
 fn process(input: &mut dyn BufRead, output: &mut dyn Write) -> Result<(), Box<dyn Error>> {
-  write!(output, "[\n")?;
+  writeln!(output, "[")?;
 
   let mut spans = vec![];
 
@@ -30,23 +30,29 @@ fn process(input: &mut dyn BufRead, output: &mut dyn Write) -> Result<(), Box<dy
   {
     let span = deserialized.get_root::<trace_span::Reader>().unwrap();
 
+    let mut categories = vec!["all", span.get_name()?];
+
     let mut annotations = BTreeMap::new();
     let annot_reader = span.get_annotations()?;
     for item in annot_reader.iter() {
       let name = item.get_name()?;
       let value = item.get_value()?;
 
+      if name == "category" {
+        categories.push(value);
+      }
+
       annotations.insert(name, value);
     }
 
     let name = span.get_name()?;
-    let cat = annotations.get("categories").map(|x| *x).unwrap_or("all");
+    let cat = categories.join(",");// annotations.get("categories").map(|x| *x).unwrap_or("all");
     let pid = 0;
     let tid = annotations.get("tid").unwrap_or(&"0").parse().unwrap_or(0);
 
     let start = serde_json::to_string(&TraceEvent {
       name,
-      cat,
+      cat: &cat,
       ph: "B",
       ts: span.get_start() / 1000,
       pid,
@@ -56,7 +62,7 @@ fn process(input: &mut dyn BufRead, output: &mut dyn Write) -> Result<(), Box<dy
 
     let end = serde_json::to_string(&TraceEvent {
       name,
-      cat,
+      cat: &cat,
       ph: "E",
       ts: span.get_end() / 1000,
       pid,
@@ -71,7 +77,7 @@ fn process(input: &mut dyn BufRead, output: &mut dyn Write) -> Result<(), Box<dy
   spans.sort_unstable_by_key(|(a, _)| *a);
 
   for (_, value) in spans {
-    write!(output, "{},\n", value)?;
+    writeln!(output, "{},", value)?;
   }
 
   Ok(())
